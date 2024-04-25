@@ -1,0 +1,37 @@
+Resources:
+  MySecurityGroup:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL:  https://dekisugiproductions.s3.ap-south-1.amazonaws.com/sg.yaml
+
+  MyTargetGroup:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL:  https://dekisugiproductions.s3.ap-south-1.amazonaws.com/target.yaml
+
+  MyLoadBalancer:
+    Type: 'AWS::ElasticLoadBalancingV2::LoadBalancer'
+    DependsOn:
+      - MySecurityGroup
+    Properties:
+      Scheme: internet-facing
+      Subnets:
+        - subnet-0c282a6d5e0ce9303 #subnet should be the one which contain ec2 running.
+        - subnet-06cd0924941bde9aa
+      SecurityGroups:
+        - !GetAtt MySecurityGroup.Outputs.GroupId
+      Tags:
+        - Key: Name
+          Value: MyLoadBalancer
+
+  MyListener:
+    Type: 'AWS::ElasticLoadBalancingV2::Listener'
+    DependsOn:
+      - MyTargetGroup
+    Properties:
+      DefaultActions:
+        - Type: forward
+          TargetGroupArn: !GetAtt MyTargetGroup.Outputs.TG
+      LoadBalancerArn: !Ref MyLoadBalancer
+      Port: 80
+      Protocol: HTTP

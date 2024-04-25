@@ -1,0 +1,55 @@
+Resources:
+  MySecurityGroup:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL:  https://dekisugiproductions.s3.ap-south-1.amazonaws.com/sg.yaml
+
+  MyInstance1:
+    Type: 'AWS::EC2::Instance'
+    DependsOn:
+      - MySecurityGroup
+    Properties:
+      AvailabilityZone: ap-south-1a
+      ImageId: ami-03bb6d83c60fc5f7c
+      InstanceType: t2.micro
+      BlockDeviceMappings:
+        - DeviceName: /dev/sda1
+          Ebs:
+            VolumeSize: 8
+      SecurityGroupIds:
+        - !GetAtt MySecurityGroup.Outputs.GroupId
+      UserData:
+        Fn::Base64: |
+          #!/bin/bash
+          sudo apt update -y
+          sudo apt install apache2 -y
+          sudo ufw allow 'Apache'  
+          sudo systemctl enable apache2
+
+  MyInstance2:
+    Type: 'AWS::EC2::Instance'
+    DependsOn:
+      - MySecurityGroup
+    Properties:
+      AvailabilityZone: ap-south-1b
+      ImageId: ami-03bb6d83c60fc5f7c
+      InstanceType: t2.micro
+      BlockDeviceMappings:
+        - DeviceName: /dev/sda1
+          Ebs:
+            VolumeSize: 8
+      SecurityGroupIds:
+        - !GetAtt MySecurityGroup.Outputs.GroupId
+      UserData:
+        Fn::Base64: |
+          #!/bin/bash
+          sudo apt update -y
+          sudo apt install apache2 -y
+          sudo ufw allow 'Apache'  
+          sudo systemctl enable apache2
+
+Outputs:
+  Instance1:
+    Value: !Ref MyInstance1
+  Instance2:
+    Value: !Ref MyInstance2

@@ -1,0 +1,27 @@
+Resources:
+  MyInstance1:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL:  https://dekisugiproductions.s3.ap-south-1.amazonaws.com/instance.yaml
+
+  MyTargetGroup:
+    Type: 'AWS::ElasticLoadBalancingV2::TargetGroup'
+    DependsOn:
+      - MyInstance1
+    Properties:
+      VpcId: 'vpc-05e8f700fe2e27c7b'
+      Protocol: HTTP
+      Port: 80
+      HealthCheckProtocol: HTTP
+      HealthCheckPort: 80
+      HealthCheckPath: /
+      TargetType: instance
+      Targets:
+      - Id: !GetAtt MyInstance1.Outputs.Instance1
+        Port: 80
+      - Id: !GetAtt MyInstance1.Outputs.Instance2
+        Port: 80
+
+Outputs:
+  TG:
+    Value: !Ref MyTargetGroup
