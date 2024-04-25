@@ -2,12 +2,12 @@ Resources:
   MySecurityGroup:
     Type: AWS::CloudFormation::Stack
     Properties:
-      TemplateURL:  https://dekisugiproductions.s3.ap-south-1.amazonaws.com/sg.yaml
+      TemplateURL:  https://bucketname.s3.ap-south-1.amazonaws.com/sg.yaml
 
   MyTargetGroup:
     Type: AWS::CloudFormation::Stack
     Properties:
-      TemplateURL:  https://dekisugiproductions.s3.ap-south-1.amazonaws.com/target.yaml
+      TemplateURL:  https://bucketname.s3.ap-south-1.amazonaws.com/target.yaml
 
   MyLoadBalancer:
     Type: 'AWS::ElasticLoadBalancingV2::LoadBalancer'
