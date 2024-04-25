@@ -1,0 +1,99 @@
+# Not Possible 
+
+AWSTemplateFormatVersion: '2010-09-09'
+Description: CloudFormation template for creating CodeDeploy resources
+
+Parameters:
+  VpcId:
+    Type: AWS::EC2::VPC::Id
+  GitHubTokenName:
+    Type: String
+    Description: GitHub token name
+  RepositoryName:
+    Type: String
+    Description: GitHub repository name
+  CommitId:
+    Type: String
+    Description: Commit ID from GitHub repository
+
+Resources:
+  MySecurityGroup:
+    Type: 'AWS::EC2::SecurityGroup'
+    Properties:
+      GroupDescription: MySecurityGroup
+      VpcId: !Ref VpcId #security Group created in our selected vpc.
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          CidrIp: 0.0.0.0/0
+
+  MyInstance1:
+    Type: 'AWS::EC2::Instance'
+    Properties:
+      AvailabilityZone: ap-south-1a
+      ImageId: ami-03bb6d83c60fc5f7c
+      InstanceType: t2.micro
+      BlockDeviceMappings:
+        - DeviceName: /dev/sda1
+          Ebs:
+            VolumeSize: 8
+      SecurityGroupIds:
+        - !GetAtt MySecurityGroup.GroupId
+      UserData:
+        Fn::Base64: |
+          #!/bin/bash
+          sudo apt update -y
+          sudo apt install -y git htop wget
+          wget -qO- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.1/install.sh | bash
+          export NVM_DIR="$HOME/.nvm"
+          [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+          [ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"
+          nvm install --lts
+
+          npm i -g pm2
+          sudo ln -s "$(which node)" /sbin/node
+          sudo ln -s "$(which npm)" /sbin/npm
+          sudo ln -s "$(which pm2)" /sbin/pm2
+
+  CodeDeployApplication:
+    Type: AWS::CodeDeploy::Application
+    Properties:
+      ApplicationName: test-node
+
+  CodeDeployDeploymentGroup:
+    Type: AWS::CodeDeploy::DeploymentGroup
+    Properties:
+      ApplicationName: !Ref CodeDeployApplication
+      DeploymentGroupName: demo
+      ServiceRoleArn: 'arn:aws:iam::730335613125:role/CodeDeploy-Role'
+      DeploymentConfigName: CodeDeployDefault.OneAtATime
+      Ec2TagFilters:
+        - Key: Name
+          Value: !Ref MyInstance1
+          Type: KEY_AND_VALUE
+      DeploymentStyle:
+        DeploymentType: IN_PLACE
+        DeploymentOption: WITHOUT_TRAFFIC_CONTROL
+
+#this step
+  CodeDeployDeployment:
+    Type: AWS::CodeDeploy::Deployment
+    Properties:
+      ApplicationName: !Ref CodeDeployApplication
+      DeploymentGroupName: !Ref CodeDeployDeploymentGroup
+      Description: "Deployment from GitHub"
+      Revision:
+        RevisionType: GitHub
+        GitHubLocation:
+          Repository: !Ref RepositoryName
+          CommitId: !Ref CommitId
+          AccessToken: !Ref GitHubTokenName

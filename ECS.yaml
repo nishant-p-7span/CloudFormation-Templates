@@ -1,0 +1,194 @@
+# Hey Chat GPT, help me write cloudformation yaml template which create ECS Cluster with following requirements:
+# name: testingcf
+# Infrastructure: Amazon EC2 instances
+# Auto Scaling Group: Create new.
+# Provisioning Model: On-demand
+# Operating System: Amazon Linux 2
+# Ec2 Instance Type: t2.micro
+# EC2 instance role arn: arn...
+# Desired capacity: min:1 max:1
+# no ssh key pair
+# Root EBS volume size: 30GB
+
+# Network settings for Amazon ec2 instance:
+# vpc: default
+# subnets: ap.south.1a, ap.south.1b, ap.south.1c
+# Use existing security group
+# sg id: sg-08390268831632b0d
+# Auto assign public ip: true
+
+# then create task definition :
+# Task definition family: test task
+# Launch type type: Amazon ec2 instances
+# OS/architecture: Linux/X86_64
+# Network mode: default
+# cpu: 1VCPU
+# Memory: 100
+# task role: arn
+# task execution role: arn
+# Container name: demo
+# Image URI: public.ecr.aws/d6n4p3g5/cloudformation:latest
+# host port: 9000
+# Container port: 9000
+
+AWSTemplateFormatVersion: 2010-09-09
+Description: The template used to create an ECS Cluster from the ECS Console.
+Parameters:
+  ECSClusterName:
+    Type: String
+    Description: >-
+      Specifies the ECS Cluster Name with which the resources would be
+      associated
+    Default: dev-cluster
+  SecurityGroupIds:
+    Type: CommaDelimitedList
+    Description: >-
+      Optional - Specifies the Comma separated list of the Security Group Id of
+      an existing Security Group.
+    Default: 'sg-08390268831632b0d'
+  VpcId:
+    Type: String
+    Description: >-
+      Optional - Specifies the ID of an existing VPC in which to launch your
+      container instances. If you specify a VPC ID, you must specify a list of
+      existing subnets in that VPC. If you do not specify a VPC ID, a new VPC is
+      created with at least 1 subnet.
+    Default: 'vpc-05e8f700fe2e27c7b'
+    AllowedPattern: '^(?:vpc-[0-9a-f]{8,17}|)$'
+    ConstraintDescription: VPC Id must begin with 'vpc-' and have a valid uuid
+  SubnetIds:
+    Type: CommaDelimitedList
+    Description: >-
+      Optional - Specifies the Comma separated list of existing VPC Subnet Ids
+      where ECS instances will run
+    Default: 'subnet-0c282a6d5e0ce9303,subnet-06cd0924941bde9aa,subnet-0315a8abacb4af0ba'
+  LatestECSOptimizedAMI:
+    Description: AMI ID
+    Type: 'AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>'
+    Default: /aws/service/ecs/optimized-ami/amazon-linux-2/recommended/image_id
+  IamRoleInstanceProfile:
+    Type: String
+    Description: >-
+      Specifies the Name or the Amazon Resource Name (ARN) of the instance
+      profile associated with the IAM role for the instance
+    Default: 'arn:aws:iam::730335613125:instance-profile/ecsInstanceRole'
+  TaskRoleArn:
+    Type: String
+    Description: ARN of the task role
+    Default: 'arn:aws:iam::730335613125:role/ecsTaskExecutionRole'
+  ExecutionRoleArn:
+    Type: String
+    Description: ARN of the task execution role
+    Default: 'arn:aws:iam::730335613125:role/ecsTaskExecutionRole'
+  ImageURI:
+    Type: String
+    Description: ECR Image URI.
+
+Resources:
+  ECSLaunchTemplate:
+    Type: 'AWS::EC2::LaunchTemplate'
+    DependsOn: ECSCluster
+    Properties:
+      LaunchTemplateData:
+        ImageId: !Ref LatestECSOptimizedAMI
+        NetworkInterfaces:
+          - AssociatePublicIpAddress: true
+            DeviceIndex: 0
+            DeleteOnTermination: true
+            Groups: !Ref SecurityGroupIds
+        InstanceType: t2.micro
+        IamInstanceProfile:
+          Arn: !Ref IamRoleInstanceProfile
+        BlockDeviceMappings:
+          - DeviceName: /dev/xvda
+            Ebs:
+              VolumeSize: '30'
+        UserData: !Base64 
+          'Fn::Sub':
+            - |-
+              #!/bin/bash 
+              echo ECS_CLUSTER=${ClusterName} >> /etc/ecs/ecs.config;
+            - ClusterName: !Ref ECSClusterName
+  ECSAutoScalingGroup:
+    Type: 'AWS::AutoScaling::AutoScalingGroup'
+    DependsOn: ECSCluster
+    Properties:
+      MinSize: '1'
+      MaxSize: '1'
+      DesiredCapacity: '1'
+      LaunchTemplate:
+        LaunchTemplateId: !Ref ECSLaunchTemplate
+        Version: !GetAtt 
+          - ECSLaunchTemplate
+          - LatestVersionNumber
+      VPCZoneIdentifier: !Ref SubnetIds
+      Tags:
+        - Key: Name
+          PropagateAtLaunch: true
+          Value: !Join 
+            - ' - '
+            - - ECS Instance
+              - !Ref ECSClusterName
+  ECSCluster:
+    Type: 'AWS::ECS::Cluster'
+    Properties:
+      ClusterName: !Ref ECSClusterName
+      ClusterSettings:
+        - Name: containerInsights
+          Value: disabled
+      Configuration:
+        ExecuteCommandConfiguration:
+          Logging: DEFAULT
+      ServiceConnectDefaults:
+        Namespace: dev-cluster
+      Tags: []
+  EC2CapacityProvider:
+    Type: 'AWS::ECS::CapacityProvider'
+    Properties:
+      AutoScalingGroupProvider:
+        AutoScalingGroupArn: !Ref ECSAutoScalingGroup
+        ManagedScaling:
+          Status: ENABLED
+          TargetCapacity: 100
+        ManagedTerminationProtection: DISABLED
+  ClusterCPAssociation:
+    Type: 'AWS::ECS::ClusterCapacityProviderAssociations'
+    DependsOn: ECSCluster
+    Properties:
+      Cluster: !Ref ECSClusterName
+      CapacityProviders:
+        - !Ref EC2CapacityProvider
+      DefaultCapacityProviderStrategy:
+        - Base: 0
+          Weight: 1
+          CapacityProvider: !Ref EC2CapacityProvider
+  TestTaskDefinition:
+    Type: AWS::ECS::TaskDefinition
+    Properties:
+      Family: test-task
+      Cpu: 1 vCPU
+      Memory: 100
+      #NetworkMode: <default>
+      TaskRoleArn: !Ref TaskRoleArn
+      ExecutionRoleArn: !Ref ExecutionRoleArn
+      ContainerDefinitions:
+        - Name: demo
+          Image: !Ref ImageURI
+          PortMappings:
+            - ContainerPort: 9000
+              HostPort: 9000
+  ECSService:
+    Type: AWS::ECS::Service
+    Properties:
+      Cluster: !Ref ECSCluster
+      LaunchType: EC2
+      DesiredCount: 1
+      TaskDefinition: !Ref TestTaskDefinition
+
+Outputs:
+  ECSCluster:
+    Description: The created cluster.
+    Value: !Ref ECSCluster
+  TestTaskDefinitionArn:
+    Value: !Ref TestTaskDefinition
+    Description: ARN of the created task definition
