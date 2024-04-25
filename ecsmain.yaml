@@ -15,19 +15,19 @@ Parameters:
   ExecutionRoleArn:
     Type: String
     Description: ARN of the task execution role
-    Default: 'arn:aws:iam::730335613125:role/ecsTaskExecutionRole'
+    Default: ''
   ECSServiceName:
     Type: String
     Default: test2service
   SecurityGroupIDs:
     Type: CommaDelimitedList
-    Default: sg-01e986b69785db09a
+    Default: 
   SubnetIDs:
     Type: CommaDelimitedList
-    Default: subnet-0c282a6d5e0ce9303,subnet-06cd0924941bde9aa,subnet-0315a8abacb4af0ba
+    Default: 
   VpcID:
     Type: String
-    Default: vpc-05e8f700fe2e27c7b
+    Default: 
   LoadBalancerName:
     Type: String
     Default: test2alb
@@ -165,7 +165,7 @@ Resources:
       MaxCapacity: '2'
       MinCapacity: '1'
       ResourceId: service/test1node-cluster/test2service
-      RoleARN: arn:aws:iam::730335613125:role/aws-service-role/ecs.application-autoscaling.amazonaws.com/AWSServiceRoleForApplicationAutoScaling_ECSService
+      RoleARN: ADD ONE...
       ScalableDimension: ecs:service:DesiredCount
       ServiceNamespace: ecs
     DependsOn:
